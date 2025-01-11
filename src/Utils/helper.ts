@@ -6,16 +6,46 @@
  * @website https://louaysleman.com
  * @copyright Copyright (c) 2024 Louay Sleman. All rights reserved.
  */
-import { Platform } from 'react-native';
+import { ErrorMessages } from '../constants';
+import { DeviceEventEmitter } from 'react-native';
 
-/**
- * Error message indicating that the 'react-native-launcher-kit' package is not linked properly.
- */
-export const LINKING_ERROR =
-  `The package 'react-native-launcher-kit' doesn't seem to be linked. Make sure: \n\n` +
-  Platform.select({
-    ios: "- This package only work on Android.'\n",
-    default: '',
-  }) +
-  '- You rebuilt the app after installing the package\n' +
-  '- You are not using Expo Go\n';
+export const handleError = <T>(
+  error: unknown,
+  errorMessage: string,
+  fallback: T,
+  additionalInfo?: Record<string, unknown>
+): T => {
+  if (__DEV__) {
+    console.error(
+      errorMessage,
+      additionalInfo ? `\nAdditional Info: ${additionalInfo}` : '',
+      '\nError:',
+      error
+    );
+  }
+  return fallback;
+};
+
+export const safeJsonParse = <T>(
+  jsonString: string | null | undefined,
+  fallback: T
+): T => {
+  if (!jsonString) return fallback;
+  try {
+    return JSON.parse(jsonString) as T;
+  } catch {
+    return handleError(
+      new Error(ErrorMessages.JSON_PARSE_ERROR),
+      ErrorMessages.JSON_PARSE_ERROR,
+      fallback
+    );
+  }
+};
+
+export const createEventListener = (
+  eventName: string,
+  callback: (app: string) => void
+): (() => void) => {
+  const subscription = DeviceEventEmitter.addListener(eventName, callback);
+  return () => subscription.remove();
+};

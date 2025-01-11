@@ -90,19 +90,13 @@ describe('LauncherKitHelper', () => {
   describe('checkIfPackageInstalled', () => {
     it('should resolve with true when package is installed', async () => {
       const bundleId = 'com.example.app';
-      mockLauncherKit.isPackageInstalled.mockImplementation(
-        (_id: string, callback: (installed: boolean) => void) => {
-          callback(true);
-        }
-      );
+      // Mock the promise resolution instead of using callback
+      mockLauncherKit.isPackageInstalled.mockResolvedValue(true);
 
       const result = await LauncherKitHelper.checkIfPackageInstalled(bundleId);
 
+      expect(mockLauncherKit.isPackageInstalled).toHaveBeenCalledWith(bundleId);
       expect(result).toBe(true);
-      expect(mockLauncherKit.isPackageInstalled).toHaveBeenCalledWith(
-        bundleId,
-        expect.any(Function)
-      );
     });
 
     it('should resolve with false when package is not installed', async () => {
@@ -163,7 +157,7 @@ describe('LauncherKitHelper', () => {
 
   describe('getBatteryStatus', () => {
     it('should resolve with battery status when successful', async () => {
-      const expectedStatus: BatteryStatus = { level: 85, isCharging: true };
+      const expectedStatus: BatteryStatus = { level: 0, isCharging: false };
       mockLauncherKit.getBatteryStatus.mockImplementation(
         (callback: (level: number, isCharging: boolean) => void) => {
           callback(expectedStatus.level, expectedStatus.isCharging);

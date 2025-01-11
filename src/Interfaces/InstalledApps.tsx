@@ -28,3 +28,5 @@ export interface InstalledApps {
   startListeningForAppRemovals(callback: (packageName: string) => void): void;
   stopListeningForAppRemovals(): void;
 }
+
+export type AppEventCallback = (app: AppDetail) => void;

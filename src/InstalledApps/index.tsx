@@ -6,86 +6,76 @@
  * @website https://louaysleman.com
  * @copyright Copyright (c) 2024 Louay Sleman. All rights reserved.
  */
-import { DeviceEventEmitter, NativeModules } from 'react-native';
+import { DeviceEventEmitter } from 'react-native';
 import type {
   AppDetail,
+  AppEventCallback,
   GetAppsOptions,
   InstalledApps,
 } from '../Interfaces/InstalledApps';
-import { LINKING_ERROR } from '../Utils/helper';
+import { AppConfig, AppEvents } from '../constants';
+import {
+  createEventListener,
+  handleError,
+  safeJsonParse,
+} from '../Utils/helper';
+import { initializeModule } from '../Utils/moduleInitializer';
 
-const LauncherKit = NativeModules.LauncherKit
-  ? NativeModules.LauncherKit
-  : new Proxy(
-      {},
-      {
-        get() {
-          throw new Error(LINKING_ERROR);
-        },
-      }
-    );
+// Initialize the LauncherKit LauncherKit
+const LauncherKit = initializeModule();
 
 /**
  * Object containing functions to retrieve information about installed apps.
  */
 const installedApps: InstalledApps = {
-  /**
-   * Returns an array of all installed apps on the device.
-   * @returns An array of `AppDetail` objects representing the installed apps.
-   */
-  async getApps(options: GetAppsOptions): Promise<AppDetail[]> {
+  async getApps(options?: GetAppsOptions): Promise<AppDetail[]> {
     try {
-      const apps =
-        (await LauncherKit?.getApps(
-          options?.includeVersion || false,
-          options?.includeAccentColor || false
-        )) || '[]';
-      return JSON.parse(apps);
+      const { includeVersion, includeAccentColor } = {
+        ...AppConfig.DEFAULT_OPTIONS,
+        ...options,
+      };
+      const apps = await LauncherKit.getApps(
+        includeVersion,
+        includeAccentColor
+      );
+      return safeJsonParse<AppDetail[]>(apps, []);
     } catch (error) {
-      if (__DEV__) console.error(error); // Log the error to the console if the app is in development mode.
-      return []; // Return an empty array if an error occurs
+      return handleError(error, '[]', []);
     }
   },
-  /**
-   * Returns an array of all installed apps on the device, sorted alphabetically by app label.
-   * @returns An array of `AppDetail` objects representing the installed apps.
-   */
-  async getSortedApps(options: GetAppsOptions): Promise<AppDetail[]> {
+
+  async getSortedApps(options?: GetAppsOptions): Promise<AppDetail[]> {
     try {
-      const apps =
-        (await LauncherKit?.getApps(
-          options?.includeVersion || false,
-          options?.includeAccentColor || false
-        )) || '[]';
-      const tempApps = JSON.parse(apps); // Attempt to parse the JSON data returned by `LauncherKit.getApps()`.
-      return tempApps.sort((a: AppDetail, b: AppDetail) =>
-        a.label?.toLowerCase().localeCompare(b.label?.toLowerCase())
-      ); // Sort the array of apps by app label in alphabetical order, ignoring case.
+      const apps = await this.getApps(options);
+      return apps.sort((a, b) =>
+        (a.label?.toLowerCase() ?? '').localeCompare(
+          b.label?.toLowerCase() ?? ''
+        )
+      );
     } catch (error) {
-      if (__DEV__) console.error(error); // Log the error to the console if the app is in development mode.
-      return []; // Return an empty array if an error occurs
+      return handleError(error, '[]', []);
     }
   },
-  startListeningForAppInstallations(callback: (app: AppDetail) => void): void {
-    DeviceEventEmitter.addListener('onAppInstalled', (app: string) => {
-      callback(JSON.parse(app));
-    });
+
+  startListeningForAppInstallations(callback: AppEventCallback): void {
+    const handler = (app: string) =>
+      callback(safeJsonParse<AppDetail>(app, {} as AppDetail));
+    createEventListener(AppEvents.APP_INSTALLED, handler);
     LauncherKit.startListeningForAppInstallations();
   },
 
   stopListeningForAppInstallations(): void {
-    DeviceEventEmitter.removeAllListeners('onAppInstalled');
+    DeviceEventEmitter.removeAllListeners(AppEvents.APP_INSTALLED);
     LauncherKit.stopListeningForAppInstallations();
   },
+
   startListeningForAppRemovals(callback: (packageName: string) => void): void {
-    DeviceEventEmitter.addListener('onAppRemoved', (packageName: string) => {
-      callback(packageName);
-    });
+    createEventListener(AppEvents.APP_REMOVED, callback);
     LauncherKit.startListeningForAppRemovals();
   },
 
   stopListeningForAppRemovals(): void {
-    DeviceEventEmitter.removeAllListeners('onAppRemoved');
+    DeviceEventEmitter.removeAllListeners(AppEvents.APP_REMOVED);
     LauncherKit.stopListeningForAppRemovals();
   },
 };

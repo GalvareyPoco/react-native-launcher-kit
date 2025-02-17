@@ -181,7 +181,7 @@ public class LauncherKitModule extends ReactContextBaseJavaModule {
     new Thread(() -> {
       Set<String> addedPackages = new HashSet<>();
       List<AppDetail> apps = new ArrayList<>();
-      PackageManager pManager = reactContext.getCurrentActivity().getPackageManager();
+      PackageManager pManager = reactContext.getPackageManager();
 
       Intent intent = new Intent(Intent.ACTION_MAIN, null);
       intent.addCategory(Intent.CATEGORY_LAUNCHER);
